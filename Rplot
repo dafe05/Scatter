@@ -1,0 +1,54 @@
+library(shiny)
+library(ggplot2)
+library(readstata13)
+#library(haven)
+library(scales)
+library(foreign)
+library(plotly)
+
+rm(list=ls())
+#ece <- read.dta13("/Users/claudiomora1/Dropbox/Consultorias/UCR-IICE-CONAPE/CONAPE/Datos-Bases/ECE/INEC/unemploy_sobreedu.dta") 
+ece <- read.dta13("C:/Users/danie/OneDrive/Documentos/R/win-library/4.0/shiny/examples/11_timer/unemploy_sobreedu.dta") 
+
+#Format data:
+ece$unemployment <- round(ece$unemployment, digits = 2)
+ece$sobreedu <- round(ece$sobreedu, digits = 2)
+
+carreras <- ece$parm1
+
+ui <- fluidPage(
+	selectizeInput(
+    	inputId = 'carrera',
+	    label = 'Elija una carrera',
+    	choices = ece$carrera,
+	    selected = NULL,
+    	multiple = FALSE, # allow for multiple inputs
+	    options = list(create = FALSE) # if TRUE, allows newly created inputs
+	), 
+	plotlyOutput("plot")
+)
+
+server <- function(input, output, session) {
+  output$plot <- renderPlotly({
+    plot <- ggplot(
+      mutate(ece, Grupo = ifelse(unemployment<median(ece$unemployment) & sobreedu<25.88 , ifelse(grepl(input$carrera, carreras) , "1", "2"), ifelse(grepl(input$carrera, carreras) , "1", "3"))), 
+      aes(unemployment, sobreedu, color=Grupo, label = carreras,
+          text = paste("Probabilidad de desempleo:", unemployment,
+                       "\nProbabilidad de Sobreeducación:", sobreedu,
+                       "\nCarrera:", carreras))) +
+      geom_jitter() +
+      geom_hline(yintercept=25.88, linetype="dashed", color = "black") +
+      geom_vline(xintercept = median(ece$unemployment), linetype="dashed", color = "black") +
+      theme_bw(base_size = 17, base_family = "Garamond", ) + 
+      guides(color=FALSE) + theme(legend.position = "none") +
+      ggtitle("Probabilidad de sobreeducación y desempleo, respecto a secundaria, por disciplina para grados universitarios") +
+      theme(plot.title = element_text(hjust = 0.5)) +
+      labs(caption = "Fuente:  Elaboración propia con base en ECE 2018-2019." ,
+           x = "Probabilidad de Desempleo") +
+      scale_y_continuous(labels = scales::comma, name = "Probabilidad sobreeducación")
+    graph.grafi.interactive <- ggplotly(plot, tooltip = "text")
+  }
+  )}
+
+
+shinyApp(ui, server)
